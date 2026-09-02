@@ -1,0 +1,51 @@
+{
+  "info": {
+    "name": "Resume ATS Task Runner",
+    "description": "API requests for testing the Resume ATS Task Runner",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Get Task Stats",
+      "request": {
+        "method": "GET",
+        "url": "http://localhost:8080/api/tasks/stats"
+      }
+    },
+    {
+      "name": "Create Simulated Task",
+      "request": {
+        "method": "POST",
+        "url": "http://localhost:8080/api/tasks/simulated?name=TestTask&failureChance=0&durationSeconds=2"
+      }
+    },
+    {
+      "name": "Create Failing Task",
+      "request": {
+        "method": "POST",
+        "url": "http://localhost:8080/api/tasks/simulated?name=FailTask&failureChance=1&durationSeconds=1"
+      }
+    },
+    {
+      "name": "Get Task Status",
+      "request": {
+        "method": "GET",
+        "url": "http://localhost:8080/api/ats/task/PUT_TASK_ID_HERE"
+      }
+    },
+    {
+      "name": "Cancel Task",
+      "request": {
+        "method": "DELETE",
+        "url": "http://localhost:8080/api/tasks/PUT_TASK_ID_HERE"
+      }
+    },
+    {
+      "name": "Submit Resume Analysis",
+      "request": {
+        "method": "POST",
+        "url": "http://localhost:8080/api/ats/analyze"
+      }
+    }
+  ]
+}
