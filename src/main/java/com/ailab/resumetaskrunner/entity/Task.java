@@ -58,10 +58,18 @@ public class Task {
 
     @Column(name = "completed_at")
     private LocalDateTime completedAt;
+    public void setStartedAt(LocalDateTime startedAt) {
+        this.startedAt = startedAt;
+    }
+
+    public void setCompletedAt(LocalDateTime completedAt) {
+        this.completedAt = completedAt;
+    }
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "analysis_id", nullable = false)
     private AtsAnalysis analysis;
+   
 
     @PrePersist
     protected void onCreate() {

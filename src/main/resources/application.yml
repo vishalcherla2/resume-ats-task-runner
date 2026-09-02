@@ -3,7 +3,7 @@ spring:
     name: resume-ats-task-runner
 
   datasource:
-    url: jdbc:mysql://localhost:3306/resume_ats_task_runner
+    url: jdbc:mysql://127.0.0.1:3306/resume_ats_task_runner
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
 
@@ -14,3 +14,7 @@ spring:
     properties:
       hibernate:
         format_sql: true
+
+task-runner:
+  max-concurrency: 2
+  scheduler-delay: 1000
