@@ -148,4 +148,48 @@ public class TaskService {
 
         return stats;
     }
+    public void validateNoCircularDependency(
+            UUID taskId,
+            UUID dependsOnTaskId) {
+
+        if (taskId.equals(dependsOnTaskId)) {
+            throw new CircularDependencyException(
+                    "Circular dependency detected"
+            );
+        }
+
+        if (createsCycle(taskId, dependsOnTaskId, new java.util.HashSet<>())) {
+            throw new CircularDependencyException(
+                    "Circular dependency detected"
+            );
+        }
+    }
+
+    private boolean createsCycle(
+            UUID originalTaskId,
+            UUID currentDependencyId,
+            java.util.Set<UUID> visited) {
+
+        if (!visited.add(currentDependencyId)) {
+            return false;
+        }
+
+        if (originalTaskId.equals(currentDependencyId)) {
+            return true;
+        }
+
+        for (TaskDependency dependency :
+                dependencyRepository.findByTaskId(currentDependencyId)) {
+
+            if (createsCycle(
+                    originalTaskId,
+                    dependency.getDependsOnTask().getId(),
+                    visited)) {
+
+                return true;
+            }
+        }
+
+        return false;
+    }
 }

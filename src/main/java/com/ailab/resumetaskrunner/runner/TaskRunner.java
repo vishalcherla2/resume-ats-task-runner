@@ -4,7 +4,9 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Semaphore;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import com.ailab.resumetaskrunner.entity.Task;
@@ -13,6 +15,8 @@ import com.ailab.resumetaskrunner.repository.TaskRepository;
 import com.ailab.resumetaskrunner.service.DependencyService;
 import com.ailab.resumetaskrunner.service.TaskExecutionService;
 
+import jakarta.annotation.PostConstruct;
+
 @Service
 public class TaskRunner {
 
@@ -20,17 +24,35 @@ public class TaskRunner {
     private final DependencyService dependencyService;
     private final TaskExecutionService taskExecutionService;
 
-    private final ExecutorService executorService =
-            Executors.newFixedThreadPool(2);
+    private final ExecutorService executorService;
+    private final Semaphore semaphore;
 
     public TaskRunner(
             TaskRepository taskRepository,
             DependencyService dependencyService,
-            TaskExecutionService taskExecutionService) {
+            TaskExecutionService taskExecutionService,
+            @Value("${task-runner.max-concurrency:2}") int maxConcurrency) {
 
         this.taskRepository = taskRepository;
         this.dependencyService = dependencyService;
         this.taskExecutionService = taskExecutionService;
+
+        this.executorService = Executors.newFixedThreadPool(maxConcurrency);
+        this.semaphore = new Semaphore(maxConcurrency);
+    }
+
+    @PostConstruct
+    public void recoverTasks() {
+
+        List<Task> runningTasks =
+                taskRepository.findByStatus(TaskStatus.RUNNING);
+
+        for (Task task : runningTasks) {
+            task.setStatus(TaskStatus.WAITING);
+            task.setRetryAfter(null);
+            task.setErrorMessage("Recovered after service restart");
+            taskRepository.save(task);
+        }
     }
 
     public void runTasks() {
@@ -40,38 +62,57 @@ public class TaskRunner {
 
         for (Task task : tasks) {
 
-            if (task.getRetryAfter() != null &&
-                task.getRetryAfter().isAfter(LocalDateTime.now())) {
-
-                continue;
+            if (!semaphore.tryAcquire()) {
+                break;
             }
 
-            if (!dependencyService.areDependenciesCompleted(
-                    task.getId())) {
+            try {
 
-                if (dependencyService.hasFailedDependency(
-                        task.getId())) {
+                if (task.getRetryAfter() != null &&
+                        task.getRetryAfter().isAfter(LocalDateTime.now())) {
 
-                    task.setStatus(TaskStatus.BLOCKED);
-                    task.setErrorMessage(
-                            "Dependency task failed"
-                    );
-
-                    taskRepository.save(task);
+                    semaphore.release();
+                    continue;
                 }
 
-                continue;
+                if (task.getStatus() == TaskStatus.CANCELLED) {
+                    semaphore.release();
+                    continue;
+                }
+
+                if (!dependencyService.areDependenciesCompleted(task.getId())) {
+
+                    if (dependencyService.hasFailedDependency(task.getId())) {
+
+                        task.setStatus(TaskStatus.BLOCKED);
+                        task.setErrorMessage("Dependency task failed");
+                        task.setCompletedAt(LocalDateTime.now());
+
+                        taskRepository.save(task);
+                    }
+
+                    semaphore.release();
+                    continue;
+                }
+
+                task.setStatus(TaskStatus.RUNNING);
+                task.setStartedAt(LocalDateTime.now());
+                task.setAttempts(task.getAttempts() + 1);
+
+                taskRepository.save(task);
+
+                executorService.submit(() -> executeTask(task));
+
+            } catch (Exception e) {
+
+                semaphore.release();
+
+                task.setStatus(TaskStatus.FAILED);
+                task.setErrorMessage(e.getMessage());
+                task.setCompletedAt(LocalDateTime.now());
+
+                taskRepository.save(task);
             }
-
-            task.setStatus(TaskStatus.RUNNING);
-            task.setStartedAt(LocalDateTime.now());
-            task.setAttempts(task.getAttempts() + 1);
-
-            taskRepository.save(task);
-
-            executorService.submit(
-                    () -> executeTask(task)
-            );
         }
     }
 
@@ -81,11 +122,18 @@ public class TaskRunner {
 
             taskExecutionService.execute(task);
 
-            task.setStatus(TaskStatus.SUCCEEDED);
-            task.setCompletedAt(LocalDateTime.now());
-            task.setRetryAfter(null);
+            Task latestTask =
+                    taskRepository.findById(task.getId()).orElse(task);
 
-            taskRepository.save(task);
+            if (latestTask.getStatus() == TaskStatus.CANCELLED) {
+                return;
+            }
+
+            latestTask.setStatus(TaskStatus.SUCCEEDED);
+            latestTask.setCompletedAt(LocalDateTime.now());
+            latestTask.setRetryAfter(null);
+
+            taskRepository.save(latestTask);
 
         } catch (Exception e) {
 
@@ -95,33 +143,41 @@ public class TaskRunner {
                             ? "Task execution failed"
                             : e.getMessage()
             );
+
+        } finally {
+
+            semaphore.release();
         }
     }
 
-    private void handleFailure(
-            Task task,
-            String errorMessage) {
+    private void handleFailure(Task task, String errorMessage) {
 
-        task.setErrorMessage(errorMessage);
+        Task latestTask =
+                taskRepository.findById(task.getId()).orElse(task);
 
-        if (task.getAttempts() < task.getMaxAttempts()) {
+        if (latestTask.getStatus() == TaskStatus.CANCELLED) {
+            return;
+        }
 
-            task.setStatus(TaskStatus.WAITING);
+        latestTask.setErrorMessage(errorMessage);
+
+        if (latestTask.getAttempts() < latestTask.getMaxAttempts()) {
+
+            latestTask.setStatus(TaskStatus.WAITING);
 
             long delaySeconds =
-                    (long) Math.pow(2, task.getAttempts());
+                    (long) Math.pow(2, latestTask.getAttempts());
 
-            task.setRetryAfter(
-                    LocalDateTime.now()
-                            .plusSeconds(delaySeconds)
+            latestTask.setRetryAfter(
+                    LocalDateTime.now().plusSeconds(delaySeconds)
             );
 
         } else {
 
-            task.setStatus(TaskStatus.FAILED);
-            task.setCompletedAt(LocalDateTime.now());
+            latestTask.setStatus(TaskStatus.FAILED);
+            latestTask.setCompletedAt(LocalDateTime.now());
         }
 
-        taskRepository.save(task);
+        taskRepository.save(latestTask);
     }
 }

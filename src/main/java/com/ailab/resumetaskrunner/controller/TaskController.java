@@ -76,4 +76,18 @@ public class TaskController {
                 taskService.getStats()
         );
     }
+    @PostMapping("/tasks/{taskId}/dependencies/{dependsOnTaskId}")
+    public ResponseEntity<String> addDependency(
+            @PathVariable UUID taskId,
+            @PathVariable UUID dependsOnTaskId) {
+
+        taskService.validateNoCircularDependency(
+                taskId,
+                dependsOnTaskId
+        );
+
+        return ResponseEntity.ok(
+                "Dependency is valid"
+        );
+    }
 }

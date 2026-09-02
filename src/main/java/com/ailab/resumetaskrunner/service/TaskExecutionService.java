@@ -2,6 +2,7 @@ package com.ailab.resumetaskrunner.service;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.concurrent.ThreadLocalRandom;
 
 import org.springframework.stereotype.Service;
 
@@ -28,6 +29,26 @@ public class TaskExecutionService {
     }
 
     public void execute(Task task) throws Exception {
+
+        if (task.getType() == TaskType.SIMULATED) {
+
+            int seconds = task.getDurationSeconds() == null
+                    ? 2
+                    : task.getDurationSeconds();
+
+            Thread.sleep(seconds * 1000L);
+
+            double failureChance =
+                    task.getFailureChance() == null
+                            ? 0.0
+                            : task.getFailureChance();
+
+            if (ThreadLocalRandom.current().nextDouble() < failureChance) {
+                throw new RuntimeException("Simulated task failure");
+            }
+
+            return;
+        }
 
         AtsAnalysis analysis = task.getAnalysis();
 

@@ -58,7 +58,28 @@ public class Task {
 
     @Column(name = "completed_at")
     private LocalDateTime completedAt;
-    public void setStartedAt(LocalDateTime startedAt) {
+    @Column(name = "failure_chance", nullable = false)
+    private Double failureChance = 0.0;
+
+    @Column(name = "duration_seconds", nullable = false)
+    private Integer durationSeconds = 2;
+    public Double getFailureChance() {
+		return failureChance;
+	}
+
+	public void setFailureChance(Double failureChance) {
+		this.failureChance = failureChance;
+	}
+
+	public Integer getDurationSeconds() {
+		return durationSeconds;
+	}
+
+	public void setDurationSeconds(Integer durationSeconds) {
+		this.durationSeconds = durationSeconds;
+	}
+
+	public void setStartedAt(LocalDateTime startedAt) {
         this.startedAt = startedAt;
     }
 
@@ -85,6 +106,13 @@ public class Task {
 
         if (maxAttempts == null) {
             maxAttempts = 3;
+        }
+        if (failureChance == null) {
+            failureChance = 0.0;
+        }
+
+        if (durationSeconds == null) {
+            durationSeconds = 2;
         }
     }
 
