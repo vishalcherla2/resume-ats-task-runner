@@ -11,4 +11,6 @@ import com.ailab.resumetaskrunner.enums.TaskStatus;
 public interface TaskRepository extends JpaRepository<Task, UUID> {
 
     List<Task> findByStatus(TaskStatus status);
+
+    long countByStatus(TaskStatus status);
 }

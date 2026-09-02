@@ -8,7 +8,6 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.Lob;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 
@@ -26,20 +25,16 @@ public class AtsAnalysis {
     @Column(name = "resume_file_path", nullable = false)
     private String resumeFilePath;
 
-    @Lob
-    @Column(name = "job_description", nullable = false)
+    @Column(name = "job_description", nullable = false, columnDefinition = "LONGTEXT")
     private String jobDescription;
 
-    @Lob
-    @Column(name = "extracted_skills")
+    @Column(name = "extracted_skills", columnDefinition = "LONGTEXT")
     private String extractedSkills;
 
-    @Lob
-    @Column(name = "matched_skills")
+    @Column(name = "matched_skills", columnDefinition = "LONGTEXT")
     private String matchedSkills;
 
-    @Lob
-    @Column(name = "missing_skills")
+    @Column(name = "missing_skills", columnDefinition = "LONGTEXT")
     private String missingSkills;
 
     @Column(name = "ats_score")

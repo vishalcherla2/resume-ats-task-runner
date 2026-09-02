@@ -15,7 +15,9 @@ public class DependencyService {
 
     private final TaskDependencyRepository dependencyRepository;
 
-    public DependencyService(TaskDependencyRepository dependencyRepository) {
+    public DependencyService(
+            TaskDependencyRepository dependencyRepository) {
+
         this.dependencyRepository = dependencyRepository;
     }
 
@@ -26,22 +28,17 @@ public class DependencyService {
 
         for (TaskDependency dependency : dependencies) {
 
-            Task dependentOnTask = dependency.getDependsOnTask();
+            Task dependentTask =
+                    dependency.getDependsOnTask();
 
-            if (dependentOnTask.getStatus() == TaskStatus.FAILED ||
-                dependentOnTask.getStatus() == TaskStatus.BLOCKED ||
-                dependentOnTask.getStatus() == TaskStatus.CANCELLED) {
-
-                return false;
-            }
-
-            if (dependentOnTask.getStatus() != TaskStatus.SUCCEEDED) {
+            if (dependentTask.getStatus() != TaskStatus.SUCCEEDED) {
                 return false;
             }
         }
 
         return true;
     }
+
     public boolean hasFailedDependency(UUID taskId) {
 
         List<TaskDependency> dependencies =
@@ -49,11 +46,15 @@ public class DependencyService {
 
         for (TaskDependency dependency : dependencies) {
 
-            Task dependentOnTask = dependency.getDependsOnTask();
+            Task dependentTask =
+                    dependency.getDependsOnTask();
 
-            if (dependentOnTask.getStatus() == TaskStatus.FAILED ||
-                dependentOnTask.getStatus() == TaskStatus.BLOCKED ||
-                dependentOnTask.getStatus() == TaskStatus.CANCELLED) {
+            TaskStatus status =
+                    dependentTask.getStatus();
+
+            if (status == TaskStatus.FAILED ||
+                status == TaskStatus.BLOCKED ||
+                status == TaskStatus.CANCELLED) {
 
                 return true;
             }

@@ -66,7 +66,7 @@ public class Task {
         this.completedAt = completedAt;
     }
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @ManyToOne(fetch = FetchType.EAGER, optional = false)
     @JoinColumn(name = "analysis_id", nullable = false)
     private AtsAnalysis analysis;
    

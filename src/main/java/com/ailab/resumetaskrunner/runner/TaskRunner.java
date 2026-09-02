@@ -11,21 +11,26 @@ import com.ailab.resumetaskrunner.entity.Task;
 import com.ailab.resumetaskrunner.enums.TaskStatus;
 import com.ailab.resumetaskrunner.repository.TaskRepository;
 import com.ailab.resumetaskrunner.service.DependencyService;
+import com.ailab.resumetaskrunner.service.TaskExecutionService;
 
 @Service
 public class TaskRunner {
 
     private final TaskRepository taskRepository;
     private final DependencyService dependencyService;
+    private final TaskExecutionService taskExecutionService;
 
     private final ExecutorService executorService =
             Executors.newFixedThreadPool(2);
 
-    public TaskRunner(TaskRepository taskRepository,
-                      DependencyService dependencyService) {
+    public TaskRunner(
+            TaskRepository taskRepository,
+            DependencyService dependencyService,
+            TaskExecutionService taskExecutionService) {
 
         this.taskRepository = taskRepository;
         this.dependencyService = dependencyService;
+        this.taskExecutionService = taskExecutionService;
     }
 
     public void runTasks() {
@@ -37,15 +42,20 @@ public class TaskRunner {
 
             if (task.getRetryAfter() != null &&
                 task.getRetryAfter().isAfter(LocalDateTime.now())) {
+
                 continue;
             }
 
-            if (!dependencyService.areDependenciesCompleted(task.getId())) {
+            if (!dependencyService.areDependenciesCompleted(
+                    task.getId())) {
 
-                if (dependencyService.hasFailedDependency(task.getId())) {
+                if (dependencyService.hasFailedDependency(
+                        task.getId())) {
 
                     task.setStatus(TaskStatus.BLOCKED);
-                    task.setErrorMessage("Dependency task failed");
+                    task.setErrorMessage(
+                            "Dependency task failed"
+                    );
 
                     taskRepository.save(task);
                 }
@@ -59,7 +69,9 @@ public class TaskRunner {
 
             taskRepository.save(task);
 
-            executorService.submit(() -> executeTask(task));
+            executorService.submit(
+                    () -> executeTask(task)
+            );
         }
     }
 
@@ -67,7 +79,7 @@ public class TaskRunner {
 
         try {
 
-            Thread.sleep(2000);
+            taskExecutionService.execute(task);
 
             task.setStatus(TaskStatus.SUCCEEDED);
             task.setCompletedAt(LocalDateTime.now());
@@ -75,15 +87,20 @@ public class TaskRunner {
 
             taskRepository.save(task);
 
-        } catch (InterruptedException e) {
+        } catch (Exception e) {
 
-            Thread.currentThread().interrupt();
-
-            handleFailure(task, "Task interrupted");
+            handleFailure(
+                    task,
+                    e.getMessage() == null
+                            ? "Task execution failed"
+                            : e.getMessage()
+            );
         }
     }
 
-    private void handleFailure(Task task, String errorMessage) {
+    private void handleFailure(
+            Task task,
+            String errorMessage) {
 
         task.setErrorMessage(errorMessage);
 
@@ -91,12 +108,12 @@ public class TaskRunner {
 
             task.setStatus(TaskStatus.WAITING);
 
-            int retryNumber = task.getAttempts();
-
-            long delaySeconds = (long) Math.pow(2, retryNumber);
+            long delaySeconds =
+                    (long) Math.pow(2, task.getAttempts());
 
             task.setRetryAfter(
-                    LocalDateTime.now().plusSeconds(delaySeconds)
+                    LocalDateTime.now()
+                            .plusSeconds(delaySeconds)
             );
 
         } else {
